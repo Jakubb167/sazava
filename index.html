@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rozcestník</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f0;
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .datetime {
+            font-size: 3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .date {
+            font-size: 1.5em;
+            color: #666;
+        }
+        
+        .links-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .link-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .link-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        
+        .link-card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+            font-weight: 600;
+        }
+        
+        .link-card a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            font-size: 0.95em;
+        }
+        
+        .link-card a:hover {
+            color: #000;
+        }
+        
+        .data-preview {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            font-size: 0.9em;
+            border: 1px solid #e8e8e8;
+        }
+        
+        .data-preview .label {
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .data-preview .value {
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .data-item {
+            margin: 5px 0;
+        }
+        
+        .loading {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .error {
+            color: #999;
+            font-size: 0.85em;
+        }
+
+        @media (max-width: 768px) {
+            .datetime {
+                font-size: 2em;
+            }
+            .date {
+                font-size: 1.2em;
+            }
+            .links-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="datetime" id="time">--:--:--</div>
+            <div class="date" id="date">--</div>
+        </div>
+        
+        <div class="links-container">
+            <div class="link-card" onclick="window.location.href='https://jakubb167.github.io/meteostanice'">
+                <h2>Meteostanice</h2>
+                <a href="https://jakubb167.github.io/meteostanice">jakubb167.github.io/meteostanice</a>
+                <div class="data-preview">
+                    <div class="label">Poslední data:</div>
+                    <div class="value loading" id="meteo-data">Načítání...</div>
+                </div>
+            </div>
+            
+            <div class="link-card" onclick="window.location.href='https://jakubb167.github.io/mereni_energie'">
+                <h2>Měření energie</h2>
+                <a href="https://jakubb167.github.io/mereni_energie">jakubb167.github.io/mereni_energie</a>
+                <div class="data-preview">
+                    <div class="label">Poslední data:</div>
+                    <div class="value loading" id="energie-data">Načítání...</div>
+                </div>
+            </div>
+            
+            <div class="link-card" onclick="window.location.href='https://jakubb167.github.io/odecty'">
+                <h2>Odečty měřidel</h2>
+                <a href="https://jakubb167.github.io/odecty">jakubb167.github.io/odecty</a>
+                <div class="data-preview">
+                    <div class="label">Poslední data:</div>
+                    <div class="value loading" id="odecty-data">Načítání...</div>
+                </div>
+            </div>
+            
+            <div class="link-card" onclick="window.location.href='https://jakubb167.github.io/timelapse'">
+                <h2>Timelapse</h2>
+                <a href="https://jakubb167.github.io/timelapse">jakubb167.github.io/timelapse</a>
+                <div class="data-preview">
+                    <div class="label">Poslední snímek:</div>
+                    <div class="value loading" id="timelapse-data">Načítání...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Aktualizace času
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('cs-CZ');
+            const dateStr = now.toLocaleDateString('cs-CZ', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            document.getElementById('time').textContent = timeStr;
+            document.getElementById('date').textContent = dateStr;
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // Funkce pro načtení dat z meteostanice
+        async function loadMeteoData() {
+            try {
+                // Zkusíme různé možné cesty k datům
+                const possibleUrls = [
+                    'https://jakubb167.github.io/meteostanice/data.json',
+                    'https://jakubb167.github.io/meteostanice/meteo_data.json',
+                    'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/meteostanice/data.json',
+                    'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/data/meteo.json'
+                ];
+                
+                for (const url of possibleUrls) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            // Pokud jsou data pole, vezmeme poslední záznam
+                            const lastData = Array.isArray(data) ? data[data.length - 1] : data;
+                            
+                            let html = '';
+                            if (lastData.timestamp || lastData.date || lastData.time) {
+                                html += `<div class="data-item">📅 ${lastData.timestamp || lastData.date || lastData.time}</div>`;
+                            }
+                            if (lastData.temperature !== undefined) {
+                                html += `<div class="data-item">🌡️ ${lastData.temperature}°C</div>`;
+                            }
+                            if (lastData.humidity !== undefined) {
+                                html += `<div class="data-item">💧 ${lastData.humidity}%</div>`;
+                            }
+                            if (lastData.pressure !== undefined) {
+                                html += `<div class="data-item">📊 ${lastData.pressure} hPa</div>`;
+                            }
+                            
+                            document.getElementById('meteo-data').innerHTML = html || 'Data načtena';
+                            document.getElementById('meteo-data').classList.remove('loading');
+                            return;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+                
+                throw new Error('Data nenalezena');
+            } catch (error) {
+                document.getElementById('meteo-data').innerHTML = 'Klikněte pro zobrazení aktuálních dat';
+                document.getElementById('meteo-data').classList.remove('loading');
+                document.getElementById('meteo-data').classList.add('error');
+            }
+        }
+        
+        // Funkce pro načtení dat z měření energie
+        async function loadEnergieData() {
+            try {
+                const possibleUrls = [
+                    'https://jakubb167.github.io/mereni_energie/data.json',
+                    'https://jakubb167.github.io/mereni_energie/energy_data.json',
+                    'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/mereni_energie/data.json'
+                ];
+                
+                for (const url of possibleUrls) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const data = await response.json();
+                            const lastData = Array.isArray(data) ? data[data.length - 1] : data;
+                            
+                            let html = '';
+                            if (lastData.timestamp || lastData.date || lastData.time) {
+                                html += `<div class="data-item">📅 ${lastData.timestamp || lastData.date || lastData.time}</div>`;
+                            }
+                            if (lastData.power !== undefined) {
+                                html += `<div class="data-item">⚡ ${lastData.power} W</div>`;
+                            }
+                            if (lastData.voltage !== undefined) {
+                                html += `<div class="data-item">🔌 ${lastData.voltage} V</div>`;
+                            }
+                            if (lastData.current !== undefined) {
+                                html += `<div class="data-item">⚡ ${lastData.current} A</div>`;
+                            }
+                            if (lastData.energy !== undefined) {
+                                html += `<div class="data-item">📊 ${lastData.energy} kWh</div>`;
+                            }
+                            
+                            document.getElementById('energie-data').innerHTML = html || 'Data načtena';
+                            document.getElementById('energie-data').classList.remove('loading');
+                            return;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+                
+                throw new Error('Data nenalezena');
+            } catch (error) {
+                document.getElementById('energie-data').innerHTML = 'Klikněte pro zobrazení aktuálních dat';
+                document.getElementById('energie-data').classList.remove('loading');
+                document.getElementById('energie-data').classList.add('error');
+            }
+        }
+        
+        // Funkce pro načtení dat z odečtů
+        async function loadOdectyData() {
+            try {
+                const possibleUrls = [
+                    'https://jakubb167.github.io/odecty/data.json',
+                    'https://jakubb167.github.io/odecty/odecty_data.json',
+                    'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/odecty/data.json'
+                ];
+                
+                for (const url of possibleUrls) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            let html = '';
+                            
+                            // Pokud jsou data objekt s více měřidly
+                            if (typeof data === 'object' && !Array.isArray(data)) {
+                                for (const [key, values] of Object.entries(data)) {
+                                    if (Array.isArray(values) && values.length > 0) {
+                                        const last = values[values.length - 1];
+                                        html += `<div class="data-item"><strong>${key}:</strong> ${last.stav || last.value || ''} (${last.datum || last.date || ''})</div>`;
+                                    }
+                                }
+                            } else if (Array.isArray(data) && data.length > 0) {
+                                const last = data[data.length - 1];
+                                if (last.datum || last.date) {
+                                    html += `<div class="data-item">📅 ${last.datum || last.date}</div>`;
+                                }
+                                if (last.stav !== undefined) {
+                                    html += `<div class="data-item">📊 Stav: ${last.stav}</div>`;
+                                }
+                            }
+                            
+                            document.getElementById('odecty-data').innerHTML = html || 'Data načtena';
+                            document.getElementById('odecty-data').classList.remove('loading');
+                            return;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+                
+                throw new Error('Data nenalezena');
+            } catch (error) {
+                document.getElementById('odecty-data').innerHTML = 'Klikněte pro zobrazení aktuálních dat';
+                document.getElementById('odecty-data').classList.remove('loading');
+                document.getElementById('odecty-data').classList.add('error');
+            }
+        }
+        
+        // Funkce pro načtení dat z timelapse
+        async function loadTimelapseData() {
+            try {
+                const possibleUrls = [
+                    'https://jakubb167.github.io/timelapse/images.json',
+                    'https://jakubb167.github.io/timelapse/data.json',
+                    'https://jakubb167.github.io/timelapse/metadata.json',
+                    'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/timelapse/images.json'
+                ];
+                
+                for (const url of possibleUrls) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            let lastDate = null;
+                            
+                            if (Array.isArray(data) && data.length > 0) {
+                                // Vezmeme poslední položku
+                                const last = data[data.length - 1];
+                                lastDate = last.date || last.timestamp || last.time || last.datetime;
+                                
+                                // Případně zkusíme extrahovat datum z názvu souboru
+                                if (!lastDate && last.filename) {
+                                    const match = last.filename.match(/(\d{4}[-_]\d{2}[-_]\d{2})/);
+                                    if (match) lastDate = match[1];
+                                }
+                            } else if (data.lastImage || data.latest) {
+                                lastDate = data.lastImage || data.latest;
+                            }
+                            
+                            if (lastDate) {
+                                document.getElementById('timelapse-data').innerHTML = `<div class="data-item">📅 ${lastDate}</div>`;
+                            } else {
+                                document.getElementById('timelapse-data').innerHTML = `<div class="data-item">📸 ${data.length || 0} snímků</div>`;
+                            }
+                            
+                            document.getElementById('timelapse-data').classList.remove('loading');
+                            return;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+                
+                throw new Error('Data nenalezena');
+            } catch (error) {
+                document.getElementById('timelapse-data').innerHTML = 'Klikněte pro zobrazení';
+                document.getElementById('timelapse-data').classList.remove('loading');
+                document.getElementById('timelapse-data').classList.add('error');
+            }
+        }
+        
+        // Načtení všech dat
+        loadMeteoData();
+        loadEnergieData();
+        loadOdectyData();
+        loadTimelapseData();
+        
+        // Pravidelná aktualizace každých 5 minut
+        setInterval(() => {
+            loadMeteoData();
+            loadEnergieData();
+            loadOdectyData();
+            loadTimelapseData();
+        }, 300000);
+    </script>
+</body>
+</html>
