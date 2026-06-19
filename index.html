@@ -325,29 +325,26 @@ function setEl(id, html, cls) {
     el.className = 'preview-body' + (cls ? ' '+cls : '');
 }
 
-// Meteostanice Sázava
+// Meteostanice Sázava – reálné API (Cloudflare Worker)
 async function loadMeteo() {
-    const urls = [
-        'https://jakubb167.github.io/meteostanice/data.json',
-        'https://jakubb167.github.io/meteostanice/meteo_data.json',
-        'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/meteostanice/data.json',
-    ];
-    for (const url of urls) {
-        try {
-            const r = await fetch(url);
-            if (!r.ok) continue;
-            const data = await r.json();
-            const d = Array.isArray(data) ? data[data.length-1] : data;
-            let html = '';
-            if (d.timestamp||d.date||d.time) html += di('📅','Čas', d.timestamp||d.date||d.time);
-            if (d.temperature!=null) html += di('🌡️','Teplota', d.temperature+'°C');
-            if (d.humidity!=null)    html += di('💧','Vlhkost', d.humidity+'%');
-            if (d.pressure!=null)    html += di('📊','Tlak', d.pressure+' hPa');
-            setEl('d-meteo', html||'Data načtena');
-            return;
-        } catch {}
+    try {
+        const r = await fetch('https://meteosazava.baborovsky-jakub.workers.dev/?_=' + Date.now());
+        if (!r.ok) throw new Error();
+        const json = await r.json();
+        if (!json.success || !json.data || !json.data.length) throw new Error();
+        const d = json.data[json.data.length - 1];
+        const dt = new Date(d.datetime);
+        const fmtT = dt.getDate().toString().padStart(2,'0')+'.'+(dt.getMonth()+1).toString().padStart(2,'0')+'. '
+                   + dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+        let html = '';
+        html += di('📅','Čas', fmtT);
+        if (d.teplota!=null) html += di('🌡️','Teplota', parseFloat(d.teplota).toFixed(1)+'°C');
+        if (d.vlhkost!=null) html += di('💧','Vlhkost', parseFloat(d.vlhkost).toFixed(0)+'%');
+        if (d.tlak!=null)    html += di('📊','Tlak', parseFloat(d.tlak).toFixed(0)+' hPa');
+        setEl('d-meteo', html);
+    } catch {
+        setEl('d-meteo', 'Klikněte pro zobrazení dat', 'error');
     }
-    setEl('d-meteo', 'Klikněte pro zobrazení dat', 'error');
 }
 
 // Meteo Milovice – načteme z PHP API
@@ -373,89 +370,75 @@ async function loadMilovice() {
     }
 }
 
-// Měření energie
+// Měření energie – reálné API (Cloudflare Worker, zdroj Shelly)
 async function loadEnergie() {
-    const urls = [
-        'https://jakubb167.github.io/mereni_energie/data.json',
-        'https://jakubb167.github.io/mereni_energie/energy_data.json',
-        'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/mereni_energie/data.json',
-    ];
-    for (const url of urls) {
-        try {
-            const r = await fetch(url);
-            if (!r.ok) continue;
-            const data = await r.json();
-            const d = Array.isArray(data) ? data[data.length-1] : data;
-            let html = '';
-            if (d.timestamp||d.date||d.time) html += di('📅','Čas', d.timestamp||d.date||d.time);
-            if (d.power!=null)   html += di('⚡','Výkon',  d.power+' W');
-            if (d.voltage!=null) html += di('🔌','Napětí', d.voltage+' V');
-            if (d.energy!=null)  html += di('📊','Energie',d.energy+' kWh');
-            setEl('d-energie', html||'Data načtena');
-            return;
-        } catch {}
+    try {
+        const r = await fetch('https://shrill-sunset-56af.baborovsky-jakub.workers.dev/?days=1&source=shelly&_=' + Date.now());
+        if (!r.ok) throw new Error();
+        const json = await r.json();
+        if (json.status !== 'success' || !json.data || !json.data.length) throw new Error();
+        // Najdi poslední záznam s validním výkonem
+        const withPower = json.data.filter(d => d.vykon !== null).sort((a,b) => new Date(a.datum_a_cas) - new Date(b.datum_a_cas));
+        const last = withPower[withPower.length - 1];
+        if (!last) throw new Error();
+        const dt = new Date(last.datum_a_cas.replace(' ', 'T'));
+        const fmtT = dt.getDate().toString().padStart(2,'0')+'.'+(dt.getMonth()+1).toString().padStart(2,'0')+'. '
+                   + dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+        let html = '';
+        html += di('📅','Čas', fmtT);
+        if (last.vykon!=null)  html += di('⚡','Výkon',  Number(last.vykon).toFixed(0)+' W');
+        if (last.napeti!=null) html += di('🔌','Napětí', Number(last.napeti).toFixed(1)+' V');
+        if (last.proud!=null)  html += di('🌊','Proud',  Number(last.proud).toFixed(2)+' A');
+        setEl('d-energie', html);
+    } catch {
+        setEl('d-energie', 'Klikněte pro zobrazení dat', 'error');
     }
-    setEl('d-energie', 'Klikněte pro zobrazení dat', 'error');
 }
 
-// Odečty
+// Odečty měřidel – Google Apps Script API
 async function loadOdecty() {
-    const urls = [
-        'https://jakubb167.github.io/odecty/data.json',
-        'https://jakubb167.github.io/odecty/odecty_data.json',
-        'https://raw.githubusercontent.com/jakubb167/jakubb167.github.io/main/odecty/data.json',
-    ];
-    for (const url of urls) {
-        try {
-            const r = await fetch(url);
-            if (!r.ok) continue;
-            const data = await r.json();
-            let html = '';
-            if (typeof data === 'object' && !Array.isArray(data)) {
-                for (const [key, vals] of Object.entries(data)) {
-                    if (Array.isArray(vals) && vals.length) {
-                        const last = vals[vals.length-1];
-                        html += di('📋', key, (last.stav||last.value||'')+(last.datum?' ('+last.datum+')':''));
-                    }
-                }
-            } else if (Array.isArray(data) && data.length) {
-                const last = data[data.length-1];
-                if (last.datum||last.date) html += di('📅','Datum', last.datum||last.date);
-                if (last.stav!=null)       html += di('📊','Stav',  last.stav);
-            }
-            setEl('d-odecty', html||'Data načtena');
-            return;
-        } catch {}
+    try {
+        const API = 'https://script.google.com/macros/s/AKfycbzB7IgNZUVrj5TwyKzgSTLWIhumVkdtDpk1q9rvWXO03qI5asEFuA4kcHQ3faX4fJ-WnQ/exec';
+        const r = await fetch(API + '?sheet=elektromer_sazava&_=' + Date.now());
+        if (!r.ok) throw new Error();
+        const data = await r.json();
+        if (!Array.isArray(data) || !data.length) throw new Error();
+        const sorted = [...data].sort((a,b) => new Date(a.datum) - new Date(b.datum));
+        const last = sorted[sorted.length - 1];
+        const dt = new Date(last.datum);
+        const fmtT = dt.toLocaleDateString('cs-CZ', {day:'2-digit', month:'2-digit', year:'numeric'});
+        let html = '';
+        html += di('📅','Datum', fmtT);
+        html += di('⚡','Elektroměr Sázava', last.stav + ' kWh');
+        setEl('d-odecty', html);
+    } catch {
+        setEl('d-odecty', 'Klikněte pro zobrazení dat', 'error');
     }
-    setEl('d-odecty', 'Klikněte pro zobrazení dat', 'error');
 }
 
-// Timelapse
+// Timelapse – Google Drive API (Kamera 1)
 async function loadTimelapse() {
-    const urls = [
-        'https://jakubb167.github.io/timelapse/images.json',
-        'https://jakubb167.github.io/timelapse/data.json',
-        'https://jakubb167.github.io/timelapse/metadata.json',
-    ];
-    for (const url of urls) {
-        try {
-            const r = await fetch(url);
-            if (!r.ok) continue;
-            const data = await r.json();
-            let html = '';
-            if (Array.isArray(data) && data.length) {
-                const last = data[data.length-1];
-                const date = last.date||last.timestamp||last.time||last.datetime;
-                if (date) html += di('📅','Datum', date);
-                html += di('📸','Snímků', data.length);
-            } else if (data.lastImage||data.latest) {
-                html += di('📅','Poslední', data.lastImage||data.latest);
-            }
-            setEl('d-timelapse', html||'Data načtena');
-            return;
-        } catch {}
+    try {
+        const API_KEY = 'AIzaSyBuHux2ZkZsHU1_m7ewFawi0G3LxfVZ0C4';
+        const folderId = '1NsKcbS7KcsZg_o549Zb2D5ku2sx7YLU9'; // Kamera 1
+        const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${API_KEY}&fields=files(id,name)&pageSize=1000`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error();
+        const json = await r.json();
+        if (json.error || !json.files) throw new Error();
+        const imgs = json.files.filter(f => /^IMG_\d{8}-\d{6}\.jpg$/i.test(f.name));
+        if (!imgs.length) throw new Error();
+        // Seřaď podle jména (obsahuje datum-čas), vezmi poslední
+        imgs.sort((a,b) => a.name.localeCompare(b.name));
+        const lastName = imgs[imgs.length - 1].name;
+        const m = lastName.match(/IMG_(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+        let html = '';
+        if (m) html += di('📅','Poslední', `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}`);
+        html += di('📸','Snímků', imgs.length.toLocaleString('cs-CZ'));
+        setEl('d-timelapse', html);
+    } catch {
+        setEl('d-timelapse', 'Klikněte pro zobrazení', 'error');
     }
-    setEl('d-timelapse', 'Klikněte pro zobrazení', 'error');
 }
 
 // ── INIT ──────────────────────────────────────────────
